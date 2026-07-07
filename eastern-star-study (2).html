@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Eastern Star Study — Quiz Game</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10162B">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="OES Study">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<style>
+  :root{
+    --bg:#10162B; --panel:#1A2140; --panel2:#222A52; --line:#333D6E;
+    --ink:#EDEAF2; --ink-dim:#A9A7C4; --gold:#E3C56D; --gold-deep:#B8963F;
+    --p-blue:#4F7BE0; --p-yellow:#E8C84A; --p-white:#F2EEE3; --p-green:#4C9E6A; --p-red:#C6473F;
+    --good:#4C9E6A; --bad:#C6473F;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:radial-gradient(1200px 800px at 50% -200px, #1B2350 0%, var(--bg) 60%);
+    color:var(--ink);
+    font-family:"Avenir Next","Segoe UI",system-ui,-apple-system,sans-serif;
+    line-height:1.5; min-height:100vh;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:28px 18px 60px;
+    padding-top:calc(28px + env(safe-area-inset-top));
+    padding-bottom:calc(60px + env(safe-area-inset-bottom));}
+  .eyebrow{
+    font-size:11px; letter-spacing:.28em; text-transform:uppercase;
+    color:var(--gold); text-align:center; margin-bottom:6px;
+  }
+  h1,h2{font-family:Georgia,"Iowan Old Style","Times New Roman",serif; font-weight:600; letter-spacing:.01em;}
+  h1{font-size:30px; text-align:center; margin-bottom:4px;}
+  h2{font-size:22px; margin-bottom:10px;}
+  .sub{color:var(--ink-dim); text-align:center; font-size:14px; margin-bottom:20px;}
+  .screen{display:none; animation:fade .35s ease;}
+  .screen.active{display:block;}
+  @keyframes fade{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;}}
+  @media (prefers-reduced-motion:reduce){ .screen{animation:none;} .starwrap svg{animation:none!important;} }
+
+  /* ---- Star emblem ---- */
+  .starwrap{display:flex; justify-content:center; margin:14px 0 18px;}
+  .starwrap svg{filter:drop-shadow(0 0 18px rgba(227,197,109,.18));}
+
+  /* ---- Cards & buttons ---- */
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px; margin-bottom:16px;}
+  .btn{
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:var(--panel2); color:var(--ink); border:1px solid var(--line);
+    border-radius:12px; padding:14px 16px; font-size:16px; font-family:inherit;
+    margin-bottom:10px; transition:border-color .15s, background .15s;
+    -webkit-tap-highlight-color:rgba(227,197,109,.25); touch-action:manipulation;
+    -webkit-appearance:none; appearance:none;
+  }
+  @media (hover:hover){ .btn:hover{border-color:var(--gold);} }
+  .btn:focus-visible{outline:2px solid var(--gold); outline-offset:2px;}
+  .btn .tag{display:block; font-size:12px; color:var(--ink-dim); margin-top:2px;}
+  .btn.center{text-align:center;}
+  .btn.gold{background:linear-gradient(180deg,var(--gold),var(--gold-deep)); color:#221B08; border:none; font-weight:600;}
+  .btn.ghost{background:transparent;}
+  .lvl-dot{display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:9px; vertical-align:1px;}
+
+  /* ---- XP bar ---- */
+  .rank{display:flex; justify-content:space-between; align-items:baseline; font-size:14px; margin-bottom:6px;}
+  .rank b{font-family:Georgia,serif; font-size:16px; color:var(--gold);}
+  .bar{height:8px; background:#0C1124; border:1px solid var(--line); border-radius:99px; overflow:hidden;}
+  .bar i{display:block; height:100%; background:linear-gradient(90deg,var(--gold-deep),var(--gold)); width:0%; transition:width .5s ease;}
+  .statline{display:flex; gap:14px; justify-content:center; color:var(--ink-dim); font-size:13px; margin-top:10px; flex-wrap:wrap;}
+  .statline b{color:var(--ink);}
+
+  /* ---- Quiz ---- */
+  .qmeta{display:flex; justify-content:space-between; align-items:center; font-size:13px; color:var(--ink-dim); margin-bottom:12px;}
+  .pill{border:1px solid var(--line); border-radius:99px; padding:3px 12px; font-size:12px; letter-spacing:.08em; text-transform:uppercase;}
+  .question{font-family:Georgia,serif; font-size:20px; margin-bottom:16px; min-height:56px;}
+  .opt{position:relative;}
+  .opt.correct{border-color:var(--good); background:rgba(76,158,106,.15);}
+  .opt.wrong{border-color:var(--bad); background:rgba(198,71,63,.15);}
+  .opt:disabled{cursor:default; opacity:.95;}
+  .feedback{min-height:24px; font-size:14px; margin:4px 0 12px; color:var(--ink-dim);}
+  .feedback.good{color:#8FD6A8;} .feedback.bad{color:#EFA49E;}
+  .hidden{display:none!important;}
+
+  /* ---- Badges ---- */
+  .badges{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;}
+  .badge{border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--panel2); text-align:center;}
+  .badge .ic{font-size:26px;}
+  .badge .nm{font-weight:600; font-size:13px; margin-top:4px;}
+  .badge .ds{font-size:11px; color:var(--ink-dim); margin-top:2px;}
+  .badge.locked{opacity:.35; filter:grayscale(1);}
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%);
+    background:linear-gradient(180deg,var(--gold),var(--gold-deep)); color:#221B08;
+    padding:10px 18px; border-radius:99px; font-weight:600; font-size:14px;
+    box-shadow:0 8px 30px rgba(0,0,0,.5); opacity:0; pointer-events:none; transition:opacity .3s, transform .3s;
+    z-index:50; max-width:90vw; text-align:center;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+
+  /* ---- Name input & profiles ---- */
+  .field{width:100%; background:#0C1124; border:1px solid var(--line); border-radius:12px;
+    color:var(--ink); font-size:17px; font-family:inherit; padding:14px 16px; margin-bottom:12px;}
+  .field:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+  .profrow{display:flex; align-items:center; gap:10px; background:var(--panel2);
+    border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:10px;}
+  .profrow .pick{flex:1; cursor:pointer; text-align:left;}
+  .profrow .pnm{font-family:Georgia,serif; font-size:17px;}
+  .profrow .pmeta{font-size:12px; color:var(--ink-dim); margin-top:2px;}
+  .profrow .pick:hover .pnm{color:var(--gold);}
+  .del{background:transparent; border:1px solid var(--line); color:var(--ink-dim);
+    border-radius:9px; padding:6px 10px; font-size:13px; cursor:pointer;}
+  .del:hover{border-color:var(--bad); color:#EFA49E;}
+  .who{font-family:Georgia,serif; font-size:15px; color:var(--gold); text-align:center; margin-bottom:2px;}
+
+  /* ---- Slider ---- */
+  .sliderrow{display:flex; align-items:center; gap:14px; margin:6px 0 2px;}
+  .sliderval{font-family:Georgia,serif; font-size:26px; color:var(--gold); min-width:46px; text-align:center;}
+  input[type=range]{-webkit-appearance:none; appearance:none; flex:1; height:8px;
+    border-radius:99px; background:linear-gradient(90deg,var(--gold-deep),var(--gold)) no-repeat;
+    background-size:50% 100%; background-color:#0C1124; border:1px solid var(--line); cursor:pointer;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none; appearance:none;
+    width:24px; height:24px; border-radius:50%; background:var(--gold); border:3px solid #221B08;
+    box-shadow:0 2px 6px rgba(0,0,0,.5); cursor:pointer;}
+  input[type=range]::-moz-range-thumb{width:22px; height:22px; border-radius:50%;
+    background:var(--gold); border:3px solid #221B08; cursor:pointer;}
+  input[type=range]:focus-visible{outline:2px solid var(--gold); outline-offset:3px;}
+  .slidercaption{font-size:13px; color:var(--ink-dim); margin-top:6px;}
+
+  .bigscore{font-family:Georgia,serif; font-size:44px; text-align:center; color:var(--gold); margin:6px 0;}
+  .center-t{text-align:center;}
+  .close-verse{font-family:Georgia,serif; font-style:italic; text-align:center; color:var(--ink-dim); margin:14px 0; font-size:15px;}
+  .divider{height:1px; background:var(--line); margin:16px 0;}
+  footer{color:#5A5F86; text-align:center; font-size:11px; margin-top:26px; letter-spacing:.06em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ WELCOME / PROFILES ============ -->
+  <section id="welcome" class="screen active">
+    <p class="eyebrow">A Study Companion</p>
+    <h1>Eastern Star Study</h1>
+    <p class="sub">Add your name to save your progress, badges, and rank on this device.</p>
+
+    <div class="starwrap" aria-hidden="true">
+      <svg viewBox="0 0 200 200" width="150" height="150" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#0C1124" stroke-width="1.5" stroke-linejoin="round">
+          <polygon points="48.3,28.8 65.8,88.9 100,64"   fill="var(--p-blue)"/>
+          <polygon points="151.7,28.8 100,64 134.2,88.9" fill="var(--p-yellow)"/>
+          <polygon points="183.7,127.2 134.2,88.9 121.2,129.1" fill="var(--p-white)"/>
+          <polygon points="100,188 121.2,129.1 78.8,129.1" fill="var(--p-green)"/>
+          <polygon points="16.3,127.2 78.8,129.1 65.8,88.9" fill="var(--p-red)"/>
+          <polygon points="121.2,129.1 134.2,88.9 100,64 65.8,88.9 78.8,129.1" fill="#141A36" stroke="var(--gold)" stroke-width="1.5"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card" id="existingProfiles" style="display:none;">
+      <h2>Continue studying</h2>
+      <div id="profileRows"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="newProfileHead">Create your profile</h2>
+      <input class="field" id="nameInput" type="text" maxlength="24" placeholder="Enter your name"
+             autocomplete="off" autocapitalize="words" enterkeyhint="go">
+      <button class="btn gold center" id="beginBtn" type="button">Begin studying →</button>
+    </div>
+    <footer>Original study questions on the Order of the Eastern Star · Progress saves on this device</footer>
+  </section>
+
+  <!-- ============ MENU ============ -->
+  <section id="menu" class="screen">
+    <p class="eyebrow">A Study Companion</p>
+    <h1>Eastern Star Study</h1>
+    <p class="sub">Learn the heroines, the emblems, the officers, and the story of the Order — one round at a time.</p>
+
+    <div class="starwrap" aria-hidden="true">
+      <svg id="bigStar" viewBox="0 0 200 200" width="190" height="190" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#0C1124" stroke-width="1.5" stroke-linejoin="round">
+          <polygon points="48.3,28.8 65.8,88.9 100,64"   fill="var(--p-blue)"/>
+          <polygon points="151.7,28.8 100,64 134.2,88.9" fill="var(--p-yellow)"/>
+          <polygon points="183.7,127.2 134.2,88.9 121.2,129.1" fill="var(--p-white)"/>
+          <polygon points="100,188 121.2,129.1 78.8,129.1" fill="var(--p-green)"/>
+          <polygon points="16.3,127.2 78.8,129.1 65.8,88.9" fill="var(--p-red)"/>
+          <polygon points="121.2,129.1 134.2,88.9 100,64 65.8,88.9 78.8,129.1"
+                   fill="#141A36" stroke="var(--gold)" stroke-width="1.5"/>
+        </g>
+        <g fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round">
+          <path d="M88 100 q12 -7 24 0"/>
+          <path d="M88 100 v6 q12 7 24 0 v-6"/>
+          <path d="M100 97 v10"/>
+        </g>
+      </svg>
+    </div>
+
+    <div class="card">
+      <p class="who" id="whoName">Seeker</p>
+      <div class="rank"><b id="rankTitle">Seeker</b><span id="rankXP">0 XP</span></div>
+      <div class="bar"><i id="rankBar"></i></div>
+      <div class="statline">
+        <span>Correct: <b id="stCorrect">0</b></span>
+        <span>Rounds: <b id="stRounds">0</b></span>
+        <span>Best streak: <b id="stStreak">0</b></span>
+        <span>Badges: <b id="stBadges">0</b></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Questions per round</h2>
+      <div class="sliderrow">
+        <input type="range" id="sizeSlider" min="5" max="20" step="1" value="10"
+               oninput="onSlider(this.value)" aria-label="Questions per round">
+        <span class="sliderval" id="sizeVal">10</span>
+      </div>
+      <p class="slidercaption">Slide from 5 to 20 to set how many questions each round asks.</p>
+    </div>
+
+    <div class="card">
+      <h2>Choose your level</h2>
+      <button class="btn" onclick="startRound('easy')"><span class="lvl-dot" style="background:var(--p-blue)"></span><b>Easy</b><span class="tag">The points, colors, emblems, and officers — the foundation.</span></button>
+      <button class="btn" onclick="startRound('medium')"><span class="lvl-dot" style="background:var(--p-yellow)"></span><b>Medium</b><span class="tag">The heroines' stories, the lessons, and the Order's history.</span></button>
+      <button class="btn" onclick="startRound('hard')"><span class="lvl-dot" style="background:var(--p-red)"></span><b>Hard</b><span class="tag">Deep history, scripture detail, and the finer points of the work.</span></button>
+    </div>
+
+    <button class="btn center ghost" onclick="showScreen('badgeScreen'); renderBadges()">🏅 View badges</button>
+    <button class="btn center ghost" onclick="goProfiles()">👥 Switch profile</button>
+    <button class="btn center ghost" onclick="resetProgress()" style="color:var(--ink-dim); font-size:13px;">Reset this profile's progress</button>
+    <footer>Original study questions on the Order of the Eastern Star · Fraternal knowledge, general history &amp; scripture</footer>
+  </section>
+
+  <!-- ============ QUIZ ============ -->
+  <section id="quiz" class="screen">
+    <div class="qmeta">
+      <span class="pill" id="qLevel">Easy</span>
+      <span id="qCount">Question 1 of 10</span>
+      <span id="qStreak">🔥 0</span>
+    </div>
+    <div class="bar" style="margin-bottom:16px;"><i id="qBar" style="background:linear-gradient(90deg,var(--p-blue),var(--gold));"></i></div>
+    <div class="card">
+      <p class="question" id="qText"></p>
+      <div id="qOptions"></div>
+      <p class="feedback" id="qFeedback"></p>
+      <button class="btn gold center hidden" id="qNext" onclick="nextQuestion()">Next question →</button>
+    </div>
+  </section>
+
+  <!-- ============ ROUND RESULT ============ -->
+  <section id="result" class="screen">
+    <p class="eyebrow">Round Complete</p>
+    <h1 id="resHead">Well done!</h1>
+    <p class="bigscore" id="resScore">0 / 10</p>
+    <p class="sub" id="resXP"></p>
+    <div class="card center-t" id="resBadges" style="display:none;"></div>
+    <div class="card">
+      <h2>Would you like to continue?</h2>
+      <button class="btn gold center" id="resAgain" onclick="continueSame()">Yes — new questions, same level</button>
+      <button class="btn center" onclick="showScreen('menu'); refreshMenu()">Yes — choose a different level</button>
+      <button class="btn center ghost" onclick="showClosing()">No — I'm finished for now</button>
+    </div>
+  </section>
+
+  <!-- ============ BADGES ============ -->
+  <section id="badgeScreen" class="screen">
+    <p class="eyebrow">Honors Earned</p>
+    <h1>Your Badges</h1>
+    <p class="sub">Keep studying to light every point of the star.</p>
+    <div class="card"><div class="badges" id="badgeGrid"></div></div>
+    <button class="btn gold center" onclick="showScreen('menu'); refreshMenu()">← Back to menu</button>
+  </section>
+
+  <!-- ============ CLOSING ============ -->
+  <section id="closing" class="screen">
+    <p class="eyebrow">Until We Meet Again</p>
+    <h1>The Study Is Closed</h1>
+    <div class="starwrap" aria-hidden="true">
+      <svg viewBox="0 0 200 200" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
+        <g stroke="#0C1124" stroke-width="1.5" stroke-linejoin="round" opacity="0.9">
+          <polygon points="48.3,28.8 65.8,88.9 100,64" fill="var(--p-blue)"/>
+          <polygon points="151.7,28.8 100,64 134.2,88.9" fill="var(--p-yellow)"/>
+          <polygon points="183.7,127.2 134.2,88.9 121.2,129.1" fill="var(--p-white)"/>
+          <polygon points="100,188 121.2,129.1 78.8,129.1" fill="var(--p-green)"/>
+          <polygon points="16.3,127.2 78.8,129.1 65.8,88.9" fill="var(--p-red)"/>
+          <polygon points="121.2,129.1 134.2,88.9 100,64 65.8,88.9 78.8,129.1" fill="#141A36" stroke="var(--gold)" stroke-width="1.5"/>
+        </g>
+      </svg>
+    </div>
+    <p class="close-verse">May the fidelity of Adah, the constancy of Ruth, the loyalty of Esther,<br>the faith of Martha, and the love of Electa go with you until we meet again.</p>
+    <div class="card center-t">
+      <p>This session you answered <b id="clCorrect">0</b> questions correctly and earned <b id="clXP">0</b> XP.</p>
+      <p style="color:var(--ink-dim); font-size:14px; margin-top:6px;">Lifetime: <span id="clLife"></span></p>
+    </div>
+    <button class="btn gold center" onclick="showScreen('menu'); refreshMenu()">Return to the menu</button>
+  </section>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   QUESTION BANKS — original study questions.
+   Format: [question, correct, wrong, wrong, wrong]
+   ============================================================ */
+const EASY = [
+["How many points does the star of the Order have?","Five","Four","Six","Seven"],
+["Which heroine represents the first star point?","Adah","Ruth","Esther","Electa"],
+["What color belongs to Adah's point?","Blue","Yellow","Green","Red"],
+["Which heroine represents the second star point?","Ruth","Adah","Martha","Esther"],
+["What color belongs to Ruth's point?","Yellow","Blue","White","Red"],
+["Which heroine represents the third star point?","Esther","Electa","Ruth","Martha"],
+["What color belongs to Esther's point?","White","Green","Yellow","Blue"],
+["Which heroine represents the fourth star point?","Martha","Esther","Adah","Electa"],
+["What color belongs to Martha's point?","Green","Red","White","Blue"],
+["Which heroine represents the fifth star point?","Electa","Martha","Ruth","Adah"],
+["What color belongs to Electa's point?","Red","Green","Blue","Yellow"],
+["What is the emblem of Adah?","The sword and veil","The sheaf","The golden cup","The broken column"],
+["What is the emblem of Ruth?","The sheaf","The crown and scepter","The sword and veil","The golden cup"],
+["What is the emblem of Esther?","The crown and scepter","The broken column","The sheaf","The sword and veil"],
+["What is the emblem of Martha?","The broken column","The golden cup","The crown and scepter","The sheaf"],
+["What is the emblem of Electa?","The golden cup","The sword and veil","The broken column","The crown and scepter"],
+["Who is the presiding officer of a chapter?","The Worthy Matron","The Worthy Patron","The Associate Matron","The Conductress"],
+["Who is the highest-ranking male officer of a chapter?","The Worthy Patron","The Sentinel","The Associate Patron","The Marshal"],
+["Who presides when the Worthy Matron is absent?","The Associate Matron","The Secretary","The Conductress","The Chaplain"],
+["Who is credited with founding the Order of the Eastern Star?","Rob Morris","Robert Macoy","Albert Pike","Albert Mackey"],
+["Which officer attends the door inside the chapter room?","The Warder","The Sentinel","The Marshal","The Organist"],
+["Which officer is stationed outside the chapter room door?","The Sentinel","The Warder","The Chaplain","The Treasurer"],
+["Which officer escorts candidates and visitors within the chapter?","The Conductress","The Marshal","The Warder","The Associate Matron"],
+["Who assists the Conductress in her duties?","The Associate Conductress","The Associate Matron","The Marshal","The Warder"],
+["Which officer leads the chapter in prayer?","The Chaplain","The Organist","The Secretary","The Worthy Patron"],
+["Which officer keeps the minutes and records of the chapter?","The Secretary","The Treasurer","The Warder","The Marshal"],
+["Which officer receives and safeguards the chapter's funds?","The Treasurer","The Secretary","The Sentinel","The Associate Patron"],
+["Which officer provides music for chapter meetings?","The Organist","The Chaplain","The Marshal","The Conductress"],
+["How is the star emblem of the Order oriented?","With one point downward","With one point upward","Lying on its side","With two points downward"],
+["What holy book rests open upon the altar?","The Bible","A hymnal","The chapter bylaws","A book of poetry"],
+["Adah is remembered as a faithful what?","Daughter","Widow","Wife","Mother"],
+["Ruth is remembered as a devoted what?","Widow","Daughter","Sister","Queen"],
+["Esther is remembered as a courageous what?","Wife","Sister","Widow","Daughter"],
+["Martha is remembered as a believing what?","Sister","Mother","Daughter","Wife"],
+["Electa is remembered as a charitable what?","Mother","Widow","Sister","Daughter"],
+["What Masonic rank must a man hold to belong to the Order?","Master Mason","Entered Apprentice","Fellowcraft","Grand Master"],
+["What figure lies at the center of the star emblem?","A pentagon","A circle","A triangle","A square"],
+["What stands at the center of the chapter room?","The altar","The piano","The secretary's desk","The flag stand"],
+["What lesson does Ruth's point teach?","Constancy","Loyalty","Faith","Charity"],
+["What lesson does Adah's point teach?","Fidelity to one's word","Patience","Humility","Silence"],
+["What lesson does Esther's point teach?","Loyalty","Constancy","Faith","Charity"],
+["What lesson does Martha's point teach?","Faith","Loyalty","Fidelity","Constancy"],
+["What lesson does Electa's point teach?","Love and charity","Faith","Loyalty","Constancy"],
+["How many heroines does the Order honor?","Five","Three","Four","Seven"],
+["Besides Master Masons, who may belong to the Order?","Women with the required family or Masonic relationship","Any adult man","Only members of the clergy","Only schoolteachers"],
+["The wise men said they had seen his star in the ____.","East","West","North","South"],
+["A local body of the Order is called a what?","Chapter","Lodge","Court","Bethel"],
+["Which two heroines share their names with books of the Bible?","Ruth and Esther","Adah and Martha","Martha and Electa","Adah and Electa"],
+["Which officer carries the flag during patriotic ceremonies?","The Marshal","The Warder","The Chaplain","The Organist"],
+["Where does the Worthy Matron sit in the chapter room?","In the East","In the West","In the North","Beside the door"],
+["Where does the Associate Matron sit in the chapter room?","In the West","In the East","In the South","Beside the altar"],
+["What tool does the Worthy Matron use to call the chapter to order?","A gavel","A bell","A staff","A trumpet"],
+["Adah was the daughter of which warrior?","Jephthah","Boaz","Mordecai","Lazarus"],
+["Ruth gleaned grain in whose fields?","Boaz","Elimelech","Haman","Ahasuerus"],
+["Esther was queen to which king?","Ahasuerus","Solomon","David","Herod"],
+["Martha was the sister of which man who was raised from the dead?","Lazarus","Obed","Mahlon","Mordecai"],
+["What is the first color in the order of the star points?","Blue","Red","White","Yellow"],
+["What is the last color in the order of the star points?","Red","Blue","Green","Yellow"]
+];
+const MEDIUM = [
+["In what year did Rob Morris create the first Eastern Star ritual?","1850","1776","1901","1826"],
+["Who reorganized the Order into its present chapter system?","Robert Macoy","Albert Pike","William Preston","Thomas Smith Webb"],
+["Rob Morris published his early ritual in a work known as what?","The Mosaic Book","The Golden Fleece","The Star Manual","The Book of Constitutions"],
+["Adah's sword and veil remind members of what?","Fidelity to a sacred promise","The dangers of travel","Royal authority","The harvest season"],
+["Ruth's sheaf recalls her willingness to do what?","Humbly glean in the fields for those she loved","Rule over a kingdom","Guard a city gate","Build an altar of stone"],
+["Esther's crown and scepter recall her willingness to risk what?","Her life for her people","Her harvest","Her inheritance","Her citizenship"],
+["Martha's broken column speaks of what?","Faith shining through grief","Victory in battle","A finished temple","Wealth and plenty"],
+["Electa's cup is a symbol of what?","Charity and hospitality","Judgment","Secrecy","Conquest"],
+["The story of Adah is drawn from which book of the Bible?","Judges","Genesis","Kings","Acts"],
+["Esther broke the law of the court by doing what?","Approaching the king without being summoned","Leaving the palace at night","Speaking to Haman in public","Fasting during a feast"],
+["Ruth made her famous pledge of devotion to whom?","Naomi","Boaz","Orpah","Miriam"],
+["Martha declared her faith to Jesus at the death of whom?","Her brother Lazarus","Her father","Her husband","Her son"],
+["The character of Electa is drawn from which epistle?","The Second Epistle of John","Romans","Hebrews","Jude"],
+["What rash vow did Jephthah make before battle?","To offer whatever first came from his house to meet him","To fast for forty days","To give away his lands","To free all his servants"],
+["Which two chapter officers must be Master Masons?","The Worthy Patron and Associate Patron","The Secretary and Treasurer","The Warder and Sentinel","The Marshal and Chaplain"],
+["In what year was the General Grand Chapter organized?","1876","1850","1900","1799"],
+["What is the emblematic flower of Electa?","The red rose","The white lily","The violet","The fern"],
+["What is the emblematic flower of Esther?","The white lily","The red rose","The sunflower","The daisy"],
+["What is the emblematic flower of Adah?","The violet","The lily","The rose","The tulip"],
+["What is the emblematic flower of Ruth?","The yellow jessamine","The violet","The red rose","The white lily"],
+["What greenery is emblematic of Martha?","The fern","Ivy","Holly","The olive branch"],
+["Which officer prepares candidates before initiation?","The Associate Conductress","The Warder","The Chaplain","The Treasurer"],
+["What is the winding path traveled during initiation called?","The labyrinth","The causeway","The pilgrim road","The circuit"],
+["In what order do candidates visit the star points?","Adah, Ruth, Esther, Martha, Electa","Electa, Martha, Esther, Ruth, Adah","Esther, Adah, Ruth, Electa, Martha","Martha, Electa, Adah, Esther, Ruth"],
+["What was Esther's Hebrew name?","Hadassah","Vashti","Zeresh","Abigail"],
+["Who plotted to destroy Esther's people?","Haman","Mordecai","Boaz","Jephthah"],
+["Who was Esther's cousin and guardian?","Mordecai","Haman","Ahasuerus","Elimelech"],
+["Ruth came from which land?","Moab","Egypt","Edom","Galilee"],
+["Who was Naomi's husband?","Elimelech","Boaz","Mahlon","Obed"],
+["What son was born to Ruth and Boaz?","Obed","Jesse","Samuel","Caleb"],
+["Ruth became the great-grandmother of which king?","David","Saul","Solomon","Hezekiah"],
+["In what village did Martha live?","Bethany","Nazareth","Jericho","Cana"],
+["Martha affirmed her belief in what?","The resurrection","Ritual sacrifice","Earthly kingship","Prophecy through dreams"],
+["Electa is remembered for showing kindness to whom?","Persecuted Christians","Roman soldiers","Traveling merchants","Palace officials"],
+["According to tradition, Electa refused to do what?","Deny her faith","Pay her taxes","Leave her city","Free her servants"],
+["The Order's motto is drawn from which Gospel?","Matthew","Mark","Luke","John"],
+["The color yellow in the Order stands for what virtue?","Constancy","Loyalty","Faith","Charity"],
+["The color red in the Order stands for what?","Fervent love and zeal","Purity","Mourning","Royalty"],
+["The color white in the Order stands for what?","Light and purity","Grief","Envy","Power"],
+["The color green in the Order stands for what?","The hope of immortal life","Wealth","Envy","Youth"],
+["The color blue in the Order stands for what?","Fidelity","Charity","Mirth","Mystery"],
+["Which officer serves at the altar during devotions?","The Chaplain","The Organist","The Sentinel","The Treasurer"],
+["Where are the five star point officers stationed?","At the points of the star surrounding the altar","In the East beside the Matron","Outside the chapter room","Along the west wall"],
+["Which governing body issues a chapter its charter?","The Grand Chapter","The local Masonic lodge","The city council","The Shrine"],
+["Chapters in most U.S. states answer to which national body?","The General Grand Chapter","The Supreme Council","The Grand Encampment","The Imperial Court"],
+["By what title is founder Rob Morris honored in the Order?","The Master Builder","The Grand Architect","The First Patron","The Star Bearer"],
+["How were women historically made eligible for membership?","Through kinship with a Master Mason","By purchasing a bond","Through their church","By civic election"],
+["What does the open Bible on the altar signify?","God's revealed will, the rule of faith","The chapter's history","The bylaws of the Order","The names of the founders"],
+["Which heroine's lesson centers on keeping one's word even at great cost?","Adah","Ruth","Martha","Electa"],
+["Which heroine's lesson honors humble labor and devotion to family?","Ruth","Esther","Electa","Adah"],
+["Which heroine teaches courage in a position of high station?","Esther","Martha","Adah","Ruth"],
+["Which heroine teaches trust in God in the midst of sorrow?","Martha","Electa","Ruth","Esther"],
+["Which heroine teaches a love that endures persecution?","Electa","Adah","Esther","Martha"],
+["How many banquets did Esther prepare for the king and Haman?","Two","One","Three","Seven"],
+["Who was queen before Esther?","Vashti","Zeresh","Hadassah","Naomi"],
+["What Jewish feast celebrates the deliverance won through Esther?","Purim","Passover","Pentecost","Tabernacles"],
+["Which officer reports alarms at the chapter room door?","The Warder","The Marshal","The Organist","The Chaplain"],
+["Where in the Bible is the Order's motto found?","Matthew 2:2","Psalm 23:1","John 3:16","Genesis 1:1"]
+];
+const HARD = [
+["At which institution is Rob Morris said to have composed the first ritual?","Eureka Masonic College in Mississippi","Harvard College","The College of William and Mary","Transylvania University"],
+["The \"Little Red Schoolhouse\" shrine of the Order stands in which state?","Mississippi","Kentucky","New York","Ohio"],
+["What later devotional book did Rob Morris write for the Order?","The Rosary of the Eastern Star","The Pearl of Great Price","The Morning Star","The Chapter Guide"],
+["Robert Macoy's 1868 ritual was known by what name?","The Adoptive Rite Ritual","The Emulation Rite","The Standard Work","The York Manual"],
+["In what city did the General Grand Chapter first convene in 1876?","Indianapolis","Chicago","Boston","St. Louis"],
+["The term \"adoptive\" Masonry traces to lodges of adoption in which country?","France","England","Scotland","Germany"],
+["In what year was Rob Morris born?","1818","1776","1850","1799"],
+["What poetic honor did Freemasonry bestow on Rob Morris in 1884?","Poet Laureate of Freemasonry","Bard of the Craft","Grand Orator","Master of Verse"],
+["Which well-known Masonic poem did Rob Morris write?","The Level and the Square","Invictus","The Village Blacksmith","The Road Not Taken"],
+["Jephthah was a mighty man of which region?","Gilead","Moab","Judea","Samaria"],
+["Against which people did Jephthah lead Israel to victory?","The Ammonites","The Philistines","The Egyptians","The Amalekites"],
+["How long did Jephthah's daughter bewail upon the mountains?","Two months","Forty days","One year","Seven weeks"],
+["In which chapter of Judges is Adah's story recorded?","Chapter 11","Chapter 3","Chapter 20","Chapter 7"],
+["How did Jephthah's daughter greet her returning father?","With timbrels and dances","Carrying a lamp","In silence at the gate","With a written scroll"],
+["How many chapters make up the Book of Ruth?","Four","Ten","Two","Seven"],
+["What custom sealed the nearer kinsman's release of his claim to Ruth?","Drawing off his sandal","Breaking a staff","Burning a scroll","Exchanging rings"],
+["In what role did Boaz act when he took Ruth as his wife?","Kinsman-redeemer","High priest","Judge of Israel","Royal scribe"],
+["Who was Ruth's first husband?","Mahlon","Chilion","Obed","Elimelech"],
+["Who was the sister-in-law who returned to Moab instead of following Naomi?","Orpah","Zeresh","Vashti","Miriam"],
+["Over how many provinces did King Ahasuerus reign?","One hundred twenty-seven","Twelve","Seventy","Three hundred"],
+["The kingdom of Ahasuerus stretched from India to where?","Ethiopia","Rome","Gaul","Babylon"],
+["In what royal city did Esther live?","Shushan","Jerusalem","Nineveh","Damascus"],
+["What law of the realm could not be revoked once written?","The law of the Medes and Persians","The law of Moses","Roman law","The law of the harvest"],
+["What became of Haman?","He was hanged on the gallows he built for Mordecai","He fled to Egypt","He was banished to Media","He was pardoned by the king"],
+["How high was the gallows Haman prepared?","Fifty cubits","Ten cubits","One hundred cubits","Thirty cubits"],
+["What resolve did Esther express before approaching the king unbidden?","That she would go even if she perished","That she would flee the city","That she would send Mordecai instead","That she would appeal to Haman first"],
+["In which chapter of John does Martha profess her faith?","Chapter 11","Chapter 1","Chapter 21","Chapter 5"],
+["How many days had Lazarus lain in the tomb?","Four","Two","Seven","Ten"],
+["In Luke's account, what troubled Martha?","Serving alone while Mary sat listening","A lost coin","A broken vessel","An unpaid debt"],
+["To whom is the Second Epistle of John addressed?","The elect lady and her children","The church at Corinth","The twelve tribes","Timothy"],
+["Under which empire's persecution is Electa traditionally said to have suffered?","The Roman Empire","The Babylonian Empire","The Greek Empire","The Persian Empire"],
+["Tradition holds that Electa and her household endured what for their faith?","Martyrdom","Exile to Egypt","A year of imprisonment only","Loss of property only"],
+["What emblem distinguishes the Worthy Patron?","The square and compasses","Crossed keys","The dove","The lyre"],
+["What emblem distinguishes the Secretary?","Crossed pens","Crossed swords","A scroll and baton","An hourglass"],
+["What emblem distinguishes the Treasurer?","Crossed keys","Crossed pens","A cornucopia","A ledger"],
+["What emblem distinguishes the Chaplain?","The open Bible","A censer","A candle","A harp"],
+["What emblem distinguishes the Organist?","The lyre","The trumpet","A bell","A songbook"],
+["What emblem distinguishes the Sentinel?","Crossed swords","The dove","A lantern","A single key"],
+["How many offices are there in a subordinate chapter?","Eighteen","Twelve","Ten","Twenty-one"],
+["What is the minimum age for membership in most jurisdictions?","Eighteen","Sixteen","Twenty-one","Twenty-five"],
+["Where does a candidate assume the obligation of the Order?","At the altar","At the chapter room door","In the East","In the preparation room"],
+["What is a chapter called before it receives its charter?","A chapter under dispensation","A provisional court","A study circle","A shadow chapter"],
+["Which Eastern Star organization parallels Prince Hall Freemasonry?","The Prince Hall affiliated Order of the Eastern Star","The Order of Amaranth","The White Shrine","The Daughters of the Nile"],
+["Macoy's Adoptive Rite conferred the Eastern Star, the Amaranth, and which third degree?","Queen of the South","Heroine of Jericho","True Kindred","The Golden Chain"],
+["Until 1921, membership in which order required prior Eastern Star membership?","The Order of Amaranth","Job's Daughters","The Grotto","The Tall Cedars"],
+["Which appendant order for Eastern Star members is centered on Christian devotion?","The White Shrine of Jerusalem","The Grotto","The Tall Cedars","The Sciots"],
+["The phrase behind the letters of the Order's motto comes from which book?","The Song of Solomon","Proverbs","Isaiah","Ecclesiastes"],
+["The motto's phrase describes the beloved as fairest among how many?","Ten thousand","One thousand","Seven nations","All the kings"],
+["What is the official emblem bearing the star and heroine symbols called?","The signet","The keystone","The cartouche","The great seal"],
+["In what year did Rob Morris die?","1888","1850","1901","1876"],
+["In which Kentucky town did Rob Morris spend his later years?","La Grange","Lexington","Louisville","Frankfort"],
+["Which international youth order for girls is supported by Eastern Star members?","The Order of the Rainbow for Girls","DeMolay","The Squires","The Acacia Club"],
+["What did Jephthah's daughter request before the vow was fulfilled?","Time to mourn upon the mountains with her companions","Gold for her dowry","A journey to Egypt","Her father's sword"],
+["Which heroine's ceremony is associated with a veil?","Adah","Ruth","Martha","Electa"],
+["At Martha's point, what symbolizes the uncertainty of earthly life?","The broken column","The full sheaf","The lighted lamp","The crown"],
+["What did the king extend to welcome Esther into his presence?","The golden scepter","A crown","A signet ring","A sealed letter"],
+["What did Mordecai refuse to do, kindling Haman's anger?","Bow down before him","Pay the yearly tribute","Leave the king's gate","Keep the fast"],
+["Which festival's date was set by the casting of lots, or \"pur\"?","Purim","Passover","The Feast of Weeks","The Day of Atonement"]
+];
+
+/* ============================================================
+   GAME STATE
+   ============================================================ */
+const XP_PER = {easy:10, medium:20, hard:30};
+const RANKS = [
+  [0,"Seeker"],[100,"Initiate of the Star"],[300,"Star Point Student"],
+  [600,"Labyrinth Traveler"],[1000,"Signet Scholar"],[1500,"Keeper of the Lessons"],
+  [2200,"Conductress of Knowledge"],[3000,"Worthy Scholar"],[4000,"Luminary of the East"],
+  [5500,"Grand Luminary"]
+];
+const BADGES = [
+ ["first","🌱","First Steps","Complete your first round"],
+ ["perfect","✨","Radiant Round","Finish a round with a perfect score"],
+ ["adah","🗡️","Adah's Fidelity","A perfect round on Easy"],
+ ["esther","👑","Esther's Crown","A perfect round on Medium"],
+ ["electa","🏆","Electa's Cup","A perfect round on Hard"],
+ ["streak10","🔥","Ruth's Constancy","Answer 10 in a row correctly"],
+ ["c25","💡","Point of Light","25 correct answers overall"],
+ ["c100","🌟","Rising Star","100 correct answers overall"],
+ ["c250","🌠","Grand Luminary","250 correct answers overall"],
+ ["r5","📖","Faithful Student","Complete 5 rounds"],
+ ["r15","🕯️","Devoted Scholar","Complete 15 rounds"],
+ ["alllvl","🧭","Labyrinth Walker","Play a round at every level"],
+ ["poolE","🌾","Gleaner of the Field","See every Easy question"],
+ ["poolM","💍","Keeper of the Signet","See every Medium question"],
+ ["poolH","🏛️","Pillar of the Work","See every Hard question"]
+];
+
+const DEFAULT_STATE = (name) => ({
+  name: name || "Seeker",
+  created: Date.now(),
+  lastPlayed: Date.now(),
+  roundSize: 10,
+  xp:0, correct:0, answered:0, rounds:0, streak:0, bestStreak:0,
+  badges:{}, levelsPlayed:{},
+  used:{easy:[], medium:[], hard:[]}
+});
+
+/* ---- Multi-profile storage ----
+   All profiles live under one key. Each profile is keyed by a generated id;
+   `active` names which profile is currently loaded into S. ---- */
+const DB_KEY = "oesStudyDB";
+let DB = loadDB();
+let S = null;          // the active profile's state (or null until one is chosen)
+
+function loadDB(){
+  try{
+    const raw = localStorage.getItem(DB_KEY);
+    if(raw){ const db = JSON.parse(raw); if(db && db.profiles) return db; }
+  }catch(e){}
+  /* migrate a legacy single-profile save, if one exists */
+  try{
+    const old = localStorage.getItem("oesStudyState");
+    if(old){
+      const s = Object.assign(DEFAULT_STATE("My Progress"), JSON.parse(old));
+      const id = "p"+Date.now();
+      return { active:id, profiles:{ [id]: s } };
+    }
+  }catch(e){}
+  return { active:null, profiles:{} };
+}
+function saveDB(){ try{ localStorage.setItem(DB_KEY, JSON.stringify(DB)); }catch(e){} }
+
+/* `save()` keeps the old name so the rest of the game is unchanged:
+   it writes the active profile back into the DB. */
+function save(){
+  if(S && DB.active){ S.lastPlayed = Date.now(); DB.profiles[DB.active] = S; saveDB(); }
+}
+
+function createProfile(name){
+  name = (name||"").trim().slice(0,24) || "Seeker";
+  const id = "p" + Date.now() + Math.floor(Math.random()*1000);
+  DB.profiles[id] = DEFAULT_STATE(name);
+  DB.active = id; S = DB.profiles[id]; saveDB();
+  return id;
+}
+function selectProfile(id){
+  if(DB.profiles[id]){ DB.active = id; S = DB.profiles[id]; saveDB(); }
+}
+function deleteProfile(id){
+  delete DB.profiles[id];
+  if(DB.active === id){ DB.active = null; S = null; }
+  saveDB();
+}
+function profileList(){
+  return Object.entries(DB.profiles)
+    .map(([id,p])=>({id, ...p}))
+    .sort((a,b)=> (b.lastPlayed||0) - (a.lastPlayed||0));
+}
+
+/* Session tracking (for closing screen) */
+let sessionCorrect = 0, sessionXP = 0;
+
+/* Round state */
+let R = null;
+
+const POOLS = {easy:EASY, medium:MEDIUM, hard:HARD};
+const LVL_LABEL = {easy:"Easy", medium:"Medium", hard:"Hard"};
+
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+
+/* Draw `count` unseen questions; reset the pool when exhausted */
+function drawQuestions(level){
+  const count = Math.min(S.roundSize || 10, POOLS[level].length);
+  const pool = POOLS[level];
+  let used = new Set(S.used[level]);
+  let avail = [];
+  for(let i=0;i<pool.length;i++) if(!used.has(i)) avail.push(i);
+  let picked = [];
+  let poolFinished = false;
+  if(avail.length >= count){
+    picked = shuffle(avail).slice(0, count);
+  } else {
+    picked = shuffle(avail);                        // take the remainder…
+    poolFinished = true;
+    S.used[level] = [];                             // …then start a fresh pool
+    const fresh = shuffle([...pool.keys()].filter(i=>!picked.includes(i)));
+    picked = picked.concat(fresh.slice(0, count - picked.length));
+  }
+  S.used[level] = S.used[level].concat(picked);
+  save();
+  return {indices:picked, poolFinished};
+}
+
+/* ============================================================
+   FLOW
+   ============================================================ */
+function showScreen(id){
+  document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  window.scrollTo({top:0});
+}
+
+function startRound(level){
+  const draw = drawQuestions(level);
+  R = { level, qs:draw.indices, i:0, score:0, newBadges:[] };
+  if(draw.poolFinished){
+    const key = level==="easy"?"poolE":level==="medium"?"poolM":"poolH";
+    earnBadge(key, R.newBadges);
+  }
+  S.levelsPlayed[level] = true;
+  document.getElementById("qLevel").textContent = LVL_LABEL[level];
+  showScreen("quiz");
+  renderQuestion();
+}
+
+function renderQuestion(){
+  const q = POOLS[R.level][R.qs[R.i]];
+  document.getElementById("qCount").textContent = `Question ${R.i+1} of ${R.qs.length}`;
+  document.getElementById("qStreak").textContent = `🔥 ${S.streak}`;
+  document.getElementById("qBar").style.width = (R.i / R.qs.length * 100) + "%";
+  document.getElementById("qText").textContent = q[0];
+  document.getElementById("qFeedback").textContent = "";
+  document.getElementById("qFeedback").className = "feedback";
+  document.getElementById("qNext").classList.add("hidden");
+  const box = document.getElementById("qOptions");
+  box.innerHTML = "";
+  const opts = shuffle([ [q[1],true],[q[2],false],[q[3],false],[q[4],false] ]);
+  opts.forEach(([text, isCorrect])=>{
+    const b = document.createElement("button");
+    b.className = "btn opt"; b.textContent = text;
+    b.onclick = ()=>answer(b, isCorrect);
+    box.appendChild(b);
+  });
+}
+
+function answer(btn, isCorrect){
+  const buttons = [...document.querySelectorAll("#qOptions .opt")];
+  buttons.forEach(b=>b.disabled = true);
+  const q = POOLS[R.level][R.qs[R.i]];
+  const fb = document.getElementById("qFeedback");
+  S.answered++;
+  if(isCorrect){
+    btn.classList.add("correct");
+    R.score++; S.correct++; sessionCorrect++;
+    S.streak++; if(S.streak > S.bestStreak) S.bestStreak = S.streak;
+    const gained = XP_PER[R.level];
+    S.xp += gained; sessionXP += gained;
+    fb.textContent = `Correct! +${gained} XP`;
+    fb.classList.add("good");
+    if(S.streak >= 10) earnBadge("streak10", R.newBadges);
+    if(S.correct >= 25) earnBadge("c25", R.newBadges);
+    if(S.correct >= 100) earnBadge("c100", R.newBadges);
+    if(S.correct >= 250) earnBadge("c250", R.newBadges);
+  } else {
+    btn.classList.add("wrong");
+    S.streak = 0;
+    buttons.forEach(b=>{ if(b.textContent === q[1]) b.classList.add("correct"); });
+    fb.textContent = `The answer is: ${q[1]}`;
+    fb.classList.add("bad");
+  }
+  save();
+  document.getElementById("qStreak").textContent = `🔥 ${S.streak}`;
+  document.getElementById("qNext").classList.remove("hidden");
+  document.getElementById("qNext").focus();
+}
+
+function nextQuestion(){
+  R.i++;
+  if(R.i < R.qs.length){ renderQuestion(); }
+  else { finishRound(); }
+}
+
+function finishRound(){
+  S.rounds++;
+  earnBadge("first", R.newBadges);
+  if(R.score === R.qs.length && R.qs.length >= 5){
+    earnBadge("perfect", R.newBadges);
+    if(R.level==="easy") earnBadge("adah", R.newBadges);
+    if(R.level==="medium") earnBadge("esther", R.newBadges);
+    if(R.level==="hard") earnBadge("electa", R.newBadges);
+  }
+  if(S.levelsPlayed.easy && S.levelsPlayed.medium && S.levelsPlayed.hard) earnBadge("alllvl", R.newBadges);
+  if(S.rounds >= 5) earnBadge("r5", R.newBadges);
+  if(S.rounds >= 15) earnBadge("r15", R.newBadges);
+  save();
+
+  const pct = R.score / R.qs.length;
+  document.getElementById("resHead").textContent =
+    pct === 1 ? "A radiant round!" : pct >= .7 ? "Well done!" : pct >= .4 ? "Good study — keep going!" : "Every round teaches something.";
+  document.getElementById("resScore").textContent = `${R.score} / ${R.qs.length}`;
+  document.getElementById("resXP").textContent = `You earned ${R.score * XP_PER[R.level]} XP on the ${LVL_LABEL[R.level]} level.`;
+  const rb = document.getElementById("resBadges");
+  if(R.newBadges.length){
+    rb.style.display = "block";
+    rb.innerHTML = "<b>New badges earned</b><br>" + R.newBadges.map(k=>{
+      const b = BADGES.find(x=>x[0]===k); return `${b[1]} ${b[2]}`;
+    }).join(" &nbsp;·&nbsp; ");
+  } else rb.style.display = "none";
+  document.getElementById("resAgain").textContent = `Yes — new ${LVL_LABEL[R.level]} questions`;
+  showScreen("result");
+}
+
+function continueSame(){ startRound(R.level); }
+
+function showClosing(){
+  document.getElementById("clCorrect").textContent = sessionCorrect;
+  document.getElementById("clXP").textContent = sessionXP;
+  document.getElementById("clLife").textContent =
+    `${S.correct} correct · ${S.xp} XP · ${Object.keys(S.badges).length} badges · rank “${rankOf(S.xp)[1]}”`;
+  showScreen("closing");
+}
+
+/* ============================================================
+   RANK, BADGES, MENU
+   ============================================================ */
+function rankOf(xp){
+  let cur = RANKS[0], next = null;
+  for(let i=0;i<RANKS.length;i++){
+    if(xp >= RANKS[i][0]) cur = RANKS[i];
+    else { next = RANKS[i]; break; }
+  }
+  return [cur[0], cur[1], next];
+}
+function refreshMenu(){
+  if(!S) return;
+  document.getElementById("whoName").textContent = "✦ " + S.name + " ✦";
+  const slider = document.getElementById("sizeSlider");
+  slider.value = S.roundSize || 10;
+  onSlider(slider.value, true);
+  const [base, title, next] = rankOf(S.xp);
+  document.getElementById("rankTitle").textContent = title;
+  document.getElementById("rankXP").textContent = next ? `${S.xp} / ${next[0]} XP` : `${S.xp} XP · highest rank`;
+  const pct = next ? ((S.xp - base) / (next[0] - base) * 100) : 100;
+  document.getElementById("rankBar").style.width = pct + "%";
+  document.getElementById("stCorrect").textContent = S.correct;
+  document.getElementById("stRounds").textContent = S.rounds;
+  document.getElementById("stStreak").textContent = S.bestStreak;
+  document.getElementById("stBadges").textContent = Object.keys(S.badges).length;
+}
+function earnBadge(key, collector){
+  if(S.badges[key]) return;
+  S.badges[key] = true; save();
+  if(collector) collector.push(key);
+  const b = BADGES.find(x=>x[0]===key);
+  toast(`${b[1]} Badge earned: ${b[2]}`);
+}
+let toastTimer = null;
+function toast(msg){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), 2600);
+}
+function renderBadges(){
+  const g = document.getElementById("badgeGrid");
+  g.innerHTML = "";
+  BADGES.forEach(([key, ic, nm, ds])=>{
+    const d = document.createElement("div");
+    d.className = "badge" + (S.badges[key] ? "" : " locked");
+    d.innerHTML = `<div class="ic">${ic}</div><div class="nm">${nm}</div><div class="ds">${ds}</div>`;
+    g.appendChild(d);
+  });
+}
+function resetProgress(){
+  if(confirm(`Reset all XP, badges, and question history for “${S.name}”?`)){
+    const keepName = S.name, keepSize = S.roundSize;
+    const fresh = DEFAULT_STATE(keepName); fresh.roundSize = keepSize; fresh.created = S.created;
+    DB.profiles[DB.active] = fresh; S = fresh;
+    sessionCorrect = 0; sessionXP = 0; saveDB(); refreshMenu();
+    toast("Progress reset. A fresh start!");
+  }
+}
+
+/* ============================================================
+   PROFILE & SETTINGS UI
+   ============================================================ */
+function onSlider(val, silent){
+  val = parseInt(val, 10);
+  document.getElementById("sizeVal").textContent = val;
+  const slider = document.getElementById("sizeSlider");
+  const pct = ((val - 5) / (20 - 5)) * 100;
+  slider.style.backgroundSize = pct + "% 100%";
+  if(!silent && S){ S.roundSize = val; save(); }
+}
+
+let profileStarting = false;
+function beginNewProfile(){
+  if(profileStarting) return;            // guard against touch+click double-fire
+  profileStarting = true;
+  const input = document.getElementById("nameInput");
+  input.blur();                          // dismiss the iOS keyboard cleanly
+  const name = input.value;
+  createProfile(name);
+  input.value = "";
+  sessionCorrect = 0; sessionXP = 0;
+  refreshMenu();
+  showScreen("menu");
+  toast(`Welcome, ${S.name}! Your progress will save here.`);
+  setTimeout(()=>{ profileStarting = false; }, 400);
+}
+
+/* iOS Safari sometimes swallows a button's click while the soft keyboard is
+   open. Bind both pointer and click, and treat Enter/Go on the field as submit. */
+(function wireBeginButton(){
+  const btn = document.getElementById("beginBtn");
+  const input = document.getElementById("nameInput");
+  if(!btn) return;
+  const fire = (e)=>{ if(e){ e.preventDefault(); } beginNewProfile(); };
+  btn.addEventListener("click", fire);
+  btn.addEventListener("touchend", fire, {passive:false});
+  if(input){
+    input.addEventListener("keydown", (e)=>{
+      if(e.key === "Enter"){ e.preventDefault(); beginNewProfile(); }
+    });
+  }
+})();
+
+function pickProfile(id){
+  selectProfile(id);
+  sessionCorrect = 0; sessionXP = 0;
+  refreshMenu();
+  showScreen("menu");
+}
+
+function removeProfile(id, name){
+  if(confirm(`Delete the profile “${name}” and all its progress? This cannot be undone.`)){
+    deleteProfile(id);
+    renderProfiles();
+  }
+}
+
+function renderProfiles(){
+  const wrap = document.getElementById("existingProfiles");
+  const rows = document.getElementById("profileRows");
+  const list = profileList();
+  const head = document.getElementById("newProfileHead");
+  if(list.length){
+    wrap.style.display = "block";
+    head.textContent = "Or create a new profile";
+    rows.innerHTML = "";
+    list.forEach(p=>{
+      const badges = Object.keys(p.badges||{}).length;
+      const div = document.createElement("div");
+      div.className = "profrow";
+      const pick = document.createElement("div");
+      pick.className = "pick";
+      pick.innerHTML = `<div class="pnm">${escapeHTML(p.name)}</div>
+        <div class="pmeta">${p.xp} XP · ${rankOf(p.xp)[1]} · ${badges} badge${badges===1?"":"s"}</div>`;
+      pick.onclick = ()=>pickProfile(p.id);
+      const del = document.createElement("button");
+      del.className = "del"; del.textContent = "Delete";
+      del.onclick = ()=>removeProfile(p.id, p.name);
+      div.appendChild(pick); div.appendChild(del);
+      rows.appendChild(div);
+    });
+  } else {
+    wrap.style.display = "none";
+    head.textContent = "Create your profile";
+  }
+}
+function escapeHTML(s){ return String(s).replace(/[&<>"']/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c])); }
+
+function goProfiles(){
+  renderProfiles();
+  showScreen("welcome");
+}
+
+/* ---- Boot: show the picker if profiles exist, else the create screen ---- */
+function boot(){
+  if(DB.active && DB.profiles[DB.active]){
+    S = DB.profiles[DB.active];
+    if(!S.roundSize) S.roundSize = 10;
+    refreshMenu();
+    showScreen("menu");
+  } else {
+    renderProfiles();
+    showScreen("welcome");
+  }
+}
+boot();
+
+/* ---- PWA: offline support & installability ---- */
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(()=>{ /* offline mode unavailable */ });
+  });
+}
+</script>
+</body>
+</html>
